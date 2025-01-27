@@ -5,35 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Application</title>
+    
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        #stream-response {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            background-color: #f9f9f9;
-            max-width: 600px;
-            white-space: pre-wrap;
-        }
-        form {
-            display: flex;
-            gap: 10px;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 8px;
-            font-size: 16px;
-        }
-        button {
-            padding: 8px 16px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+
+
 </head>
 
 <body>
@@ -46,7 +22,9 @@
     </form>
 
     <!-- Display streaming response -->
-    <div id="stream-response" hx-get="/stream" hx-trigger="PromptSubmitted from:body" hx-vals='js:{id: event.detail.id}'></div>
+    <div id="stream-response" hx-get="/stream-component"  hx-trigger="PromptSubmitted from:body" hx-vals='js:{id: event.detail.id}'></div>
+
+
 
 </body>
 

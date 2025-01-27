@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -26,16 +28,43 @@ func main() {
 		// Trigger an event to notify the client
 		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"PromptSubmitted": {"id": "%s"}}`, promptID))
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf("Prompt submitted with ID: %s", promptID)))
+	})
+
+	r.Get("/stream-component", func(w http.ResponseWriter, r *http.Request) {
+		// Retrieve the query parameter value
+		id := r.URL.Query().Get("id")
+		StreamComponent(id).Render(r.Context(), w)
 	})
 
 	r.Get("/stream", func(w http.ResponseWriter, r *http.Request) {
-		// Retrieve the query parameter value
-		id := r.URL.Query().Get("id")
-
-		// Simulate streaming data
+		// Set headers for SSE
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.Write([]byte("data: Streaming response for ID: " + id + "\n\n"))
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		// Token generation configuration
+		totalTokens := 1000
+		delayPerToken := 100 * time.Millisecond
+		timeout := 10 * time.Second
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
+		defer cancel()
+
+		// Use the `llm` function with the context
+		for token := range llm(ctx, delayPerToken, totalTokens) {
+			// Send the generated token as an SSE message
+			fmt.Fprintf(w, "event: update\ndata: %s\n\n", token)
+			flusher.Flush()
+		}
+
+		// Signal the end of the stream
+		fmt.Fprintf(w, "event: close\ndata: Stream completed\n\n")
+		flusher.Flush()
 	})
 
 	fmt.Println("Server is running on http://localhost:8081")

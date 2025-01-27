@@ -1,0 +1,8 @@
+version: 3
+
+tasks:
+
+  install-templ: go install github.com/a-h/templ/cmd/templ@latest
+  install-wgo: go install github.com/bokwoon95/wgo@latest
+  dev: 'wgo -file=.go -file=.templ -xfile=_templ.go templ generate :: go mod tidy :: go run .'
+  tidy: go mod tidy
