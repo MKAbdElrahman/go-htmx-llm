@@ -4,5 +4,6 @@ tasks:
 
   install-templ: go install github.com/a-h/templ/cmd/templ@latest
   install-wgo: go install github.com/bokwoon95/wgo@latest
-  dev: 'wgo -file=.go -file=.templ -xfile=_templ.go templ generate :: go mod tidy :: go run .'
+  dev: 'wgo -file=.go -file=.templ -xfile=_templ.go templ generate :: go mod tidy :: go run ./cmd'
   tidy: go mod tidy
+  context:  python3 cat-context.py 

@@ -131,37 +131,49 @@ func (s *ChatService) GetRecentAggregatedTokens(chatId, promptId string) (string
 	return "", ErrPromptNotFound
 }
 
-func (s *ChatService) Start() {
-	s.pubSub.Subscribe("TokensGenerated", func(payload interface{}) {
-		data, ok := payload.(map[string]interface{})
-		if !ok {
-			log.Println("Invalid payload for TokensGenerated event")
-			return
-		}
+func (s *ChatService) ListenForTokensGenerated() <-chan string {
+	tokenCh := make(chan string, 100)
+	go func() {
+		s.pubSub.Subscribe("TokensGenerated", func(payload interface{}) {
+			data, ok := payload.(map[string]interface{})
+			if !ok {
+				log.Println("Invalid payload for TokensGenerated event")
+				return
+			}
 
-		// Extract event data.
-		chatID, ok := data["chatId"].(string)
-		if !ok {
-			log.Println("Invalid chatId in TokensGenerated event")
-			return
-		}
+			// Extract event data.
+			chatID, ok := data["chatId"].(string)
+			if !ok {
+				log.Println("Invalid chatId in TokensGenerated event")
+				return
+			}
 
-		promptID, ok := data["promptId"].(string)
-		if !ok {
-			log.Println("Invalid promptId in TokensGenerated event")
-			return
-		}
+			promptID, ok := data["promptId"].(string)
+			if !ok {
+				log.Println("Invalid promptId in TokensGenerated event")
+				return
+			}
 
-		responseText, ok := data["responseText"].(string)
-		if !ok {
-			log.Println("Invalid responseText in TokensGenerated event")
-			return
-		}
+			responseText, ok := data["responseText"].(string)
+			if !ok {
+				log.Println("Invalid responseText in TokensGenerated event")
+				return
+			}
 
-		// Handle the TokensGenerated event.
-		err := s.HandleTokensGenerated(chatID, promptID, responseText)
-		if err != nil {
-			log.Printf("Failed to handle TokensGenerated event: %v\n", err)
-		}
-	})
+			go func() {
+				// Send the response text to the token channel.
+				tokenCh <- responseText
+			}()
+
+			// Handle the TokensGenerated event and send token to the channel.
+			err := s.HandleTokensGenerated(chatID, promptID, responseText)
+			if err != nil {
+				log.Printf("Failed to handle TokensGenerated event: %v\n", err)
+				return
+			}
+
+		})
+	}()
+
+	return tokenCh
 }
