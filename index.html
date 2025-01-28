@@ -5,25 +5,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Application</title>
-    
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 </head>
 
-<body>
-    <h1>Chat Application</h1>
-
-    <!-- Form for submitting a prompt -->
-    <form hx-post="/prompt" hx-swap="none" hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';">
-        <input type="text" id="prompt" name="prompt" placeholder="Enter your prompt..." required>
-        <button type="submit">Submit</button>
-    </form>
+<body class="bg-[#1a1a1a] text-[#e5e5e5] p-6 flex flex-col h-screen">
 
     <!-- Display streaming response -->
-    <div id="stream-response" hx-ext="sse" sse-connect="/stream" sse-swap="update" hx-swap="beforeend">
-        <!-- Responses will be appended here -->
+    <div
+        id="main-content"
+        class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4"
+    >
+        <div 
+            id="stream-response" 
+            hx-ext="sse" 
+            sse-connect="/stream" 
+            sse-swap="update" 
+            hx-swap="beforeend">
+            <!-- Responses will be appended here -->
+        </div>
     </div>
 
+    <!-- Prompt area -->
+    <div class="p-6 flex flex-col">
+        <div class="text-[#e5e5e5] flex-grow flex flex-col">
+            <form
+                hx-post="/prompt" 
+                hx-swap="none" 
+                hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';"
+                class="flex items-center space-x-2 bg-[#1a1a1a] rounded-lg border border-[#3a3a3c] p-2 hover:border-[#4C9C94] transition-colors duration-200"
+            >
+                <!-- Send Icon (Interactive Animations) -->
+                <button
+                    type="submit"
+                    class="p-1 text-[#4C9C94] hover:text-[#007acc] transition-colors duration-200 flex items-center justify-center group"
+                >
+                    <svg
+                        class="w-4 h-4 hover:w-5 hover:h-5 transition-all duration-200 animate-bounce group-hover:animate-pulse group-active:animate-ping"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                        ></path>
+                    </svg>
+                </button>
+                <!-- Input Field -->
+                <input
+                    type="text"
+                    id="prompt-input"
+                    name="prompt"
+                    placeholder="Type your prompt..."
+                    class="w-full p-2 bg-transparent text-[#e5e5e5] focus:outline-none placeholder-[#a1a1aa]"
+                    required
+                />
+                <input type="hidden" id="prompt-index" name="prompt-index" value="-1"/>
+            </form>
+        </div>
+    </div>
 </body>
 
 </html>

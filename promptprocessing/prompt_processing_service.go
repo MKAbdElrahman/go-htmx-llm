@@ -51,7 +51,7 @@ func (s *PromptProcessingService) Start() {
 		// Publish TokensGenerated events for each token
 		go func() {
 			for token := range tokenChan {
-				// log.Printf("Generated token for ChatID=%s, PromptID=%s: %s\n", chatID, promptID, token)
+				log.Printf("Generated token for ChatID=%s, PromptID=%s: %s\n", "***", promptID, token)
 				s.pubSub.Publish("TokensGenerated", map[string]interface{}{
 					"chatId":       chatID,
 					"promptId":     promptID,

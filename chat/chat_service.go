@@ -103,8 +103,7 @@ func (s *ChatService) HandleTokensGenerated(chatId, promptId, responseText strin
 		log.Printf("Error adding response to prompt: %v\n", err)
 		return err
 	}
-
-	// log.Printf("Token added to ChatID=%s, PromptID=%s: %s\n", chatId, promptId, responseText)
+	log.Printf("Token added to ChatID=%s, PromptID=%s: %s\n", "***", promptId, responseText)
 	return nil
 }
 

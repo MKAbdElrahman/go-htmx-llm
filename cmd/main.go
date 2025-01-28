@@ -82,7 +82,6 @@ func main() {
 					flusher.Flush()
 					return
 				}
-				fmt.Printf("-->  read token %s from channel\n", token)
 
 				// Send the generated token as an SSE message
 				fmt.Fprintf(w, "event: update\ndata: %s\n\n", token)
