@@ -1,34 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Application</title>
-    
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-
-
+    <title>Chat</title>
 </head>
-
 <body>
-    <h1>Chat Application</h1>
+    <div id="response"></div>
+    <script>
+        const chatId = "your-chat-id"; // Replace with actual chat ID
+        const promptId = "your-prompt-id"; // Replace with actual prompt ID
 
-    <!-- Form for submitting a prompt -->
-    <form hx-post="/prompt" hx-swap="none">
-        <input type="text"  id="prompt"  name="prompt" placeholder="Enter your prompt..." required>
-        <button type="submit">Submit</button>
-    </form>
+        const eventSource = new EventSource(`/stream-response?chatId=${chatId}&promptId=${promptId}`);
 
+        eventSource.onmessage = function(event) {
+            const responseDiv = document.getElementById("response");
+            responseDiv.innerHTML += event.data;
+        };
 
-
-
-    <!-- Display streaming response -->
-    <div id="stream-response" hx-get="/stream-component"  hx-trigger="PromptSubmitted from:body" hx-vals='js:{id: event.detail.id}'></div>
-
-
-
+        eventSource.onerror = function(event) {
+            console.error("EventSource failed:", event);
+            eventSource.close();
+        };
+    </script>
 </body>
-
 </html>

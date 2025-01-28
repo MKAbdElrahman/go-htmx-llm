@@ -1,0 +1,13 @@
+
+make the changes
+
+define  handlers  for the chat service 
+
+// the user   will submit prompts and the chat handlers will stream back the response using server side streaming  
+
+
+// there will be one end point for getting index package
+
+// the other endpoins wil be used to  send prompts 
+
+// when the user sends a prompt, the chat  service will send back the responses 
