@@ -95,6 +95,6 @@ func main() {
 		}
 	})
 
-	fmt.Println("Server is running on http://localhost:8081")
-	http.ListenAndServe(":8081", r)
+	fmt.Println("Server is running on http://localhost:3000")
+	http.ListenAndServe(":3000", r)
 }
