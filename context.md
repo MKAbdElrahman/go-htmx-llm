@@ -1,7 +1,8 @@
-=== File: ./chat/chat_repository.go ===
-Type: File
-Extension: .go
-Content:
+## File: `./chat/chat_repository.go`
+- **Type**: File
+- **Extension**: `.go`
+### Content:
+```go
 package chat
 
 import (
@@ -170,11 +171,13 @@ func (r *ChatRepository) AddResponseToPrompt(chatId, promptId, responseText stri
 	return ErrPromptNotFound
 }
 
+```
 
-=== File: ./chat/chat_service.go ===
-Type: File
-Extension: .go
-Content:
+## File: `./chat/chat_service.go`
+- **Type**: File
+- **Extension**: `.go`
+### Content:
+```go
 package chat
 
 import (
@@ -355,11 +358,13 @@ func (s *ChatService) ListenForTokensGenerated() <-chan string {
 	return tokenCh
 }
 
+```
 
-=== File: ./prompt-processing/ollama-engine.go ===
-Type: File
-Extension: .go
-Content:
+## File: `./prompt-processing/ollama-engine.go`
+- **Type**: File
+- **Extension**: `.go`
+### Content:
+```go
 package promptprocessing
 
 import (
@@ -410,11 +415,13 @@ func (o *OllamaEngine) GenerateTokens(ctx context.Context, prompt string) (<-cha
 	return tokenChan, nil
 }
 
+```
 
-=== File: ./prompt-processing/prompt_processing_service.go ===
-Type: File
-Extension: .go
-Content:
+## File: `./prompt-processing/prompt_processing_service.go`
+- **Type**: File
+- **Extension**: `.go`
+### Content:
+```go
 package promptprocessing
 
 import (
@@ -480,11 +487,13 @@ func (s *PromptProcessingService) Start() {
 	})
 }
 
+```
 
-=== File: ./index.html ===
-Type: File
-Extension: .html
-Content:
+## File: `./index.html`
+- **Type**: File
+- **Extension**: `.html`
+### Content:
+```html
 <!DOCTYPE html>
 <html lang="en">
 
@@ -519,16 +528,21 @@ Content:
 </body>
 
 </html>
+```
 
-=== File: ./prompt.txt ===
-Type: File
-Extension: .txt
-Content:
+## File: `./prompt.md`
+- **Type**: File
+- **Extension**: `.md`
+### Content:
+```markdown
+## Some Coding Standards
 
- #################
- My Requiremetns: 
+- Avoid any comments. only if it add something the code doesn't show 
+
+
+## Requiremetns 
  
- the  templ component is showing one token at all times, new token clears the past token, 
+1- get rid of the templ component I want one single index.html file.
 
- I want to aggregate the tokens as they stream from the server
+```
 

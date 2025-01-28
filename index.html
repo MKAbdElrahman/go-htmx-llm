@@ -8,8 +8,6 @@
     
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-
-
 </head>
 
 <body>
@@ -17,17 +15,14 @@
 
     <!-- Form for submitting a prompt -->
     <form hx-post="/prompt" hx-swap="none">
-        <input type="text"  id="prompt"  name="prompt" placeholder="Enter your prompt..." required>
+        <input type="text" id="prompt" name="prompt" placeholder="Enter your prompt..." required>
         <button type="submit">Submit</button>
     </form>
 
-
-
-
     <!-- Display streaming response -->
-    <div id="stream-response" hx-get="/stream-component"  hx-trigger="PromptSubmitted from:body" hx-vals='js:{id: event.detail.id}'></div>
-
-
+    <div id="stream-response" hx-ext="sse" sse-connect="/stream" sse-swap="update" hx-swap="beforeend">
+        <!-- Responses will be appended here -->
+    </div>
 
 </body>
 

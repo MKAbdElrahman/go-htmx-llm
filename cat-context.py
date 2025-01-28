@@ -1,5 +1,18 @@
 import os
 
+# Map file extensions to Markdown code block languages
+EXTENSION_TO_LANGUAGE = {
+    ".go": "go",
+    ".py": "python",
+    ".js": "javascript",
+    ".java": "java",
+    ".html": "html",
+    ".css": "css",
+    ".md": "markdown",
+    ".txt": "text",
+    # Add more extensions and languages as needed
+}
+
 def concatenate_files(inputs, output_file, ignore_extensions=None):
     if ignore_extensions is None:
         ignore_extensions = []  # Default to an empty list if no extensions are provided
@@ -13,13 +26,24 @@ def concatenate_files(inputs, output_file, ignore_extensions=None):
                     continue
                 try:
                     with open(item, 'r') as infile:
-                        # Write metadata and content in a structured format
-                        outfile.write(f"=== File: {item} ===\n")
-                        outfile.write(f"Type: File\n")
-                        outfile.write(f"Extension: {os.path.splitext(item)[1]}\n")
-                        outfile.write(f"Content:\n")
+                        # Get file extension and corresponding language
+                        file_extension = os.path.splitext(item)[1]
+                        language = EXTENSION_TO_LANGUAGE.get(file_extension, "")
+                        
+                        # Write metadata and content in Markdown format
+                        outfile.write(f"## File: `{item}`\n")
+                        outfile.write(f"- **Type**: File\n")
+                        outfile.write(f"- **Extension**: `{file_extension}`\n")
+                        outfile.write(f"### Content:\n")
+                        
+                        # Add language-specific code block syntax
+                        if language:
+                            outfile.write(f"```{language}\n")
+                        else:
+                            outfile.write("```\n")
+                        
                         outfile.write(infile.read())
-                        outfile.write("\n\n")  # Add extra spacing between files
+                        outfile.write("\n```\n\n")  # Add extra spacing between files
                 except Exception as e:
                     print(f"Error reading {item}: {e}")
             elif os.path.isdir(item):
@@ -32,13 +56,24 @@ def concatenate_files(inputs, output_file, ignore_extensions=None):
                             continue
                         try:
                             with open(file_path, 'r') as infile:
-                                # Write metadata and content in a structured format
-                                outfile.write(f"=== File: {file_path} ===\n")
-                                outfile.write(f"Type: File\n")
-                                outfile.write(f"Extension: {os.path.splitext(file)[1]}\n")
-                                outfile.write(f"Content:\n")
+                                # Get file extension and corresponding language
+                                file_extension = os.path.splitext(file)[1]
+                                language = EXTENSION_TO_LANGUAGE.get(file_extension, "")
+                                
+                                # Write metadata and content in Markdown format
+                                outfile.write(f"## File: `{file_path}`\n")
+                                outfile.write(f"- **Type**: File\n")
+                                outfile.write(f"- **Extension**: `{file_extension}`\n")
+                                outfile.write(f"### Content:\n")
+                                
+                                # Add language-specific code block syntax
+                                if language:
+                                    outfile.write(f"```{language}\n")
+                                else:
+                                    outfile.write("```\n")
+                                
                                 outfile.write(infile.read())
-                                outfile.write("\n\n")  # Add extra spacing between files
+                                outfile.write("\n```\n\n")  # Add extra spacing between files
                         except Exception as e:
                             print(f"Error reading {file_path}: {e}")
             else:
@@ -51,11 +86,11 @@ if __name__ == "__main__":
         "/cmd", 
         "./prompt-processing",
         "./index.html",
-        "./prompt.txt",
+        "./prompt.md",
     ]
 
     # Output file where the concatenated content will be written
-    output_file = "context.txt"
+    output_file = "context.md"  # Save as a Markdown file
 
     # List of file extensions to ignore (e.g., [".log", ".tmp"])
     ignore_extensions = [".log", ".tmp"]

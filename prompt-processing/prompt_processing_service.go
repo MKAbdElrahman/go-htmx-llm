@@ -25,7 +25,6 @@ func NewPromptProcessingService(pubSub *pubsub.PubSub, llmEngine LLMEngineType) 
 	}
 }
 
-// Start starts listening for "PromptSubmitted" events.
 func (s *PromptProcessingService) Start() {
 	s.pubSub.Subscribe("PromptSubmitted", func(payload interface{}) {
 		data, ok := payload.(map[string]interface{})
@@ -34,14 +33,14 @@ func (s *PromptProcessingService) Start() {
 			return
 		}
 
-		// Extract event data.
+		// Extract event data
 		chatID := data["chatId"].(string)
 		promptID := data["promptId"].(string)
 		promptText := data["promptText"].(string)
 
 		log.Printf("Processing prompt: ChatID=%s, PromptID=%s, Text=%s\n", chatID, promptID, promptText)
 
-		// Generate tokens using the LLM engine.
+		// Generate tokens using the LLM engine
 		ctx := context.Background()
 		tokenChan, err := s.llmEngine.GenerateTokens(ctx, promptText)
 		if err != nil {
@@ -49,7 +48,7 @@ func (s *PromptProcessingService) Start() {
 			return
 		}
 
-		// Publish TokensGenerated events for each token.
+		// Publish TokensGenerated events for each token
 		go func() {
 			for token := range tokenChan {
 				log.Printf("Generated token for ChatID=%s, PromptID=%s: %s\n", chatID, promptID, token)

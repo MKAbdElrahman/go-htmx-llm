@@ -21,14 +21,14 @@ func NewOllamaEngine(model string) *OllamaEngine {
 	}
 }
 
-// GenerateTokens generates tokens using the Ollama model and sends them through a channel.
 func (o *OllamaEngine) GenerateTokens(ctx context.Context, prompt string) (<-chan string, error) {
 	llm, err := ollama.New(ollama.WithModel(o.model))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ollama LLM: %w", err)
 	}
 
-	tokenChan := make(chan string)
+	// Use a buffered channel to avoid dropping tokens
+	tokenChan := make(chan string, 100) // Buffer size of 100
 
 	go func() {
 		defer close(tokenChan)
@@ -36,6 +36,7 @@ func (o *OllamaEngine) GenerateTokens(ctx context.Context, prompt string) (<-cha
 		_, err := llm.Call(ctx, prompt,
 			llms.WithTemperature(0.8),
 			llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+				// Send the token to the buffered channel
 				tokenChan <- string(chunk)
 				return nil
 			}),
