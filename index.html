@@ -17,9 +17,12 @@
 
     <!-- Form for submitting a prompt -->
     <form hx-post="/prompt" hx-swap="none">
-        <input type="text" name="prompt" placeholder="Enter your prompt..." required>
+        <input type="text"  id="prompt"  name="prompt" placeholder="Enter your prompt..." required>
         <button type="submit">Submit</button>
     </form>
+
+
+
 
     <!-- Display streaming response -->
     <div id="stream-response" hx-get="/stream-component"  hx-trigger="PromptSubmitted from:body" hx-vals='js:{id: event.detail.id}'></div>

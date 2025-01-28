@@ -22,11 +22,24 @@ func main() {
 
 	// Endpoint to handle prompt submission with UUID generation
 	r.Post("/prompt", func(w http.ResponseWriter, r *http.Request) {
+
+		// Extract the prompt submitted
+
+		p := r.FormValue("prompt")
+		if p == "" {
+			http.Error(w, "Message is required", http.StatusBadRequest)
+			return
+		}
+
+		pID := uuid.New().String()
+
+		fmt.Printf("New User Prompt Submitted Assigned ID: %s\n", pID)
 		// Generate a random UUID for each request using google uuid
-		promptID := uuid.New().String()
+
+		
 
 		// Trigger an event to notify the client
-		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"PromptSubmitted": {"id": "%s"}}`, promptID))
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"PromptSubmitted": {"id": "%s"}}`, pID))
 		w.WriteHeader(http.StatusOK)
 	})
 
