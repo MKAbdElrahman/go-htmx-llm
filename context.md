@@ -360,131 +360,123 @@ func (s *ChatService) ListenForTokensGenerated() <-chan string {
 
 ```
 
-## File: `./prompt-processing/ollama-engine.go`
+## File: `./cmd/main.go`
 - **Type**: File
 - **Extension**: `.go`
 ### Content:
 ```go
-package promptprocessing
+package main
 
 import (
-	"context"
+	"demo/chat"
+	"demo/promptprocessing"
+	"demo/pubsub"
 	"fmt"
 	"log"
+	"net/http"
+	"strings"
 
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/ollama"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 )
 
-// OllamaEngine implements the LLMEngineType interface using the Ollama model.
-type OllamaEngine struct {
-	model string
-}
+func main() {
+	ps := pubsub.NewPubSub()
 
-// NewOllamaEngine creates a new OllamaEngine with the specified model.
-func NewOllamaEngine(model string) *OllamaEngine {
-	return &OllamaEngine{
-		model: model,
-	}
-}
+	chatRepository := chat.NewChatRepository()
+	chatService := chat.NewChatService(chatRepository, ps)
+	tokensCh := chatService.ListenForTokensGenerated()
 
-// GenerateTokens generates tokens using the Ollama model and sends them through a channel.
-func (o *OllamaEngine) GenerateTokens(ctx context.Context, prompt string) (<-chan string, error) {
-	llm, err := ollama.New(ollama.WithModel(o.model))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Ollama LLM: %w", err)
-	}
+	// Create an Ollama LLM engine.
+	ollamaEngine := promptprocessing.NewOllamaEngine("llama3.1:8b")
+	promptprocessingService := promptprocessing.NewPromptProcessingService(ps, ollamaEngine)
+	promptprocessingService.Start()
 
-	tokenChan := make(chan string)
+	r := chi.NewRouter()
 
-	go func() {
-		defer close(tokenChan)
+	r.Use(middleware.Logger)
 
-		_, err := llm.Call(ctx, prompt,
-			llms.WithTemperature(0.8),
-			llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-				tokenChan <- string(chunk)
-				return nil
-			}),
-		)
-		if err != nil {
-			log.Printf("Error generating tokens: %v", err)
-		}
-	}()
-
-	return tokenChan, nil
-}
-
-```
-
-## File: `./prompt-processing/prompt_processing_service.go`
-- **Type**: File
-- **Extension**: `.go`
-### Content:
-```go
-package promptprocessing
-
-import (
-	"context"
-	"demo/pubsub"
-	"log"
-)
-
-// LLMEngineType defines the interface for any LLM engine.
-type LLMEngineType interface {
-	GenerateTokens(ctx context.Context, prompt string) (<-chan string, error)
-}
-
-// PromptProcessingService handles processing prompts.
-type PromptProcessingService struct {
-	pubSub    *pubsub.PubSub
-	llmEngine LLMEngineType
-}
-
-// NewPromptProcessingService creates a new PromptProcessingService with the given LLM engine.
-func NewPromptProcessingService(pubSub *pubsub.PubSub, llmEngine LLMEngineType) *PromptProcessingService {
-	return &PromptProcessingService{
-		pubSub:    pubSub,
-		llmEngine: llmEngine,
-	}
-}
-
-// Start starts listening for "PromptSubmitted" events.
-func (s *PromptProcessingService) Start() {
-	s.pubSub.Subscribe("PromptSubmitted", func(payload interface{}) {
-		data, ok := payload.(map[string]interface{})
-		if !ok {
-			log.Println("Invalid payload for PromptSubmitted event")
-			return
-		}
-
-		// Extract event data.
-		chatID := data["chatId"].(string)
-		promptID := data["promptId"].(string)
-		promptText := data["promptText"].(string)
-
-		log.Printf("Processing prompt: ChatID=%s, PromptID=%s, Text=%s\n", chatID, promptID, promptText)
-
-		// Generate tokens using the LLM engine.
-		ctx := context.Background()
-		tokenChan, err := s.llmEngine.GenerateTokens(ctx, promptText)
-		if err != nil {
-			log.Printf("Error generating tokens: %v", err)
-			return
-		}
-
-		// Publish TokensGenerated events for each token.
-		go func() {
-			for token := range tokenChan {
-				log.Printf("Generated token for ChatID=%s, PromptID=%s: %s\n", chatID, promptID, token)
-				s.pubSub.Publish("TokensGenerated", map[string]interface{}{
-					"chatId":       chatID,
-					"promptId":     promptID,
-					"responseText": token,
-				})
-			}
-		}()
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "index.html")
 	})
+
+	// Endpoint to handle prompt submission with UUID generation
+	r.Post("/prompt", func(w http.ResponseWriter, r *http.Request) {
+		// Extract the prompt submitted
+		txt := r.FormValue("prompt")
+		if txt == "" {
+			http.Error(w, "Message is required", http.StatusBadRequest)
+			return
+		}
+
+		chatId := chatService.CreateChat("TestChat")
+		p, err := chatService.SubmitPrompt(chatId, txt)
+		if err != nil {
+			http.Error(w, "Failed to submit prompt", http.StatusInternalServerError)
+			return
+		}
+
+		// Trigger an event to notify the client
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"PromptSubmitted": {"id": "%s"}}`, p.Id()))
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Get("/stream", func(w http.ResponseWriter, r *http.Request) {
+		// Set headers for SSE
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		// Ensure the response writer supports flushing
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		// Get the request context
+		ctx := r.Context()
+
+		// Send initial message to confirm connection
+		fmt.Fprintf(w, "event: connected\ndata: Connection established\n\n")
+		flusher.Flush()
+
+		var buffer strings.Builder
+		for {
+			select {
+			case token, ok := <-tokensCh:
+				if !ok {
+					// Channel closed, signal the end of the stream
+					if buffer.Len() > 0 {
+						fmt.Fprintf(w, "event: update\ndata: %s\n\n", buffer.String())
+						buffer.Reset()
+						flusher.Flush()
+					}
+					fmt.Fprintf(w, "event: close\ndata: Stream completed\n\n")
+					flusher.Flush()
+					return
+				}
+
+				log.Printf("read token %s from channel\n", token)
+				// Append token to buffer
+				buffer.WriteString(token + " ")
+
+				// Check if the buffer contains a complete sentence (ends with a period)
+				if strings.HasSuffix(strings.TrimSpace(buffer.String()), ".") {
+					fmt.Fprintf(w, "event: update\ndata: %s\n\n", buffer.String())
+					buffer.Reset()
+					flusher.Flush()
+				}
+			case <-ctx.Done():
+				// Client disconnected
+				log.Println("Client disconnected")
+				return
+			}
+		}
+	})
+
+	fmt.Println("Server is running on http://localhost:8081")
+	http.ListenAndServe(":8081", r)
 }
 
 ```
@@ -504,26 +496,21 @@ func (s *PromptProcessingService) Start() {
     
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-
-
 </head>
 
 <body>
     <h1>Chat Application</h1>
 
     <!-- Form for submitting a prompt -->
-    <form hx-post="/prompt" hx-swap="none">
-        <input type="text"  id="prompt"  name="prompt" placeholder="Enter your prompt..." required>
+    <form hx-post="/prompt" hx-swap="none" hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';">
+        <input type="text" id="prompt" name="prompt" placeholder="Enter your prompt..." required>
         <button type="submit">Submit</button>
     </form>
 
-
-
-
     <!-- Display streaming response -->
-    <div id="stream-response" hx-get="/stream-component"  hx-trigger="PromptSubmitted from:body" hx-vals='js:{id: event.detail.id}'></div>
-
-
+    <div id="stream-response" hx-ext="sse" sse-connect="/stream" sse-swap="update" hx-swap="beforeend">
+        <!-- Responses will be appended here -->
+    </div>
 
 </body>
 
@@ -535,14 +522,32 @@ func (s *PromptProcessingService) Start() {
 - **Extension**: `.md`
 ### Content:
 ```markdown
-## Some Coding Standards
+## Requirements
 
-- Avoid any comments. only if it add something the code doesn't show 
+ - fix the stream endpoint
 
-
-## Requiremetns 
- 
-1- get rid of the templ component I want one single index.html file.
-
+ the event stream look like thisin chrome  chat
+connected	Connection established	
+17:52:34.814
+update	are	
+17:52:38.699
+update	today	
+17:52:39.100
+update	Is	
+17:52:39.511
+update	something	
+17:52:39.893
+update	can	
+17:52:40.277
+update	with	
+17:52:40.650
+update	would	
+17:52:41.034
+update	like	
+17:52:41.439
+update	chat	
+17:52:41.815
+update		
+17:52:42.191
 ```
 

@@ -14,7 +14,7 @@
     <h1>Chat Application</h1>
 
     <!-- Form for submitting a prompt -->
-    <form hx-post="/prompt" hx-swap="none">
+    <form hx-post="/prompt" hx-swap="none" hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';">
         <input type="text" id="prompt" name="prompt" placeholder="Enter your prompt..." required>
         <button type="submit">Submit</button>
     </form>

@@ -104,7 +104,7 @@ func (s *ChatService) HandleTokensGenerated(chatId, promptId, responseText strin
 		return err
 	}
 
-	log.Printf("Token added to ChatID=%s, PromptID=%s: %s\n", chatId, promptId, responseText)
+	// log.Printf("Token added to ChatID=%s, PromptID=%s: %s\n", chatId, promptId, responseText)
 	return nil
 }
 

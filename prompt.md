@@ -1,8 +1,27 @@
-## Some Coding Standards
+## Requirements
 
-- Avoid any comments. only if it add something the code doesn't show 
+ - fix the stream endpoint
 
-
-## Requiremetns 
- 
-1- get rid of the templ component I want one single index.html file.
+ the event stream look like thisin chrome  chat
+connected	Connection established	
+17:52:34.814
+update	are	
+17:52:38.699
+update	today	
+17:52:39.100
+update	Is	
+17:52:39.511
+update	something	
+17:52:39.893
+update	can	
+17:52:40.277
+update	with	
+17:52:40.650
+update	would	
+17:52:41.034
+update	like	
+17:52:41.439
+update	chat	
+17:52:41.815
+update		
+17:52:42.191
