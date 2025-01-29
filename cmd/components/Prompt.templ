@@ -9,7 +9,6 @@ templ Prompt() {
 				hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';"
 				class="flex items-center space-x-2 bg-[#1a1a1a] rounded-lg border border-[#3a3a3c] p-2 hover:border-[#4C9C94] transition-colors duration-200"
 			>
-				<!-- Send Icon (Interactive Animations) -->
 				<button
 					type="submit"
 					class="p-1 text-[#4C9C94] hover:text-[#007acc] transition-colors duration-200 flex items-center justify-center group"
@@ -29,7 +28,6 @@ templ Prompt() {
 						></path>
 					</svg>
 				</button>
-				<!-- Input Field -->
 				<input
 					type="text"
 					id="prompt-input"

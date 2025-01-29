@@ -12,22 +12,15 @@
 
 <body class="bg-[#1a1a1a] text-[#e5e5e5] p-6 flex flex-col h-screen">
 
-    <!-- Display streaming response -->
-    <div hx-trigger="PromptSubmitted from:body" hx-get="/stream-component" hx-select-oob="#stream-response">
-    </div>
-
-    <div id="stream-response"
-        class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4">
-    </div>
+    <div hx-trigger="PromptSubmitted from:body" hx-get="/stream-component" hx-select-oob="#stream-response"></div>
+    <div id="stream-response"></div>
 
 
 
     <div id="prompt-component" hx-get="/prompt-component" hx-trigger="load">
-
     </div>
 
-    <!-- Prompt area -->
-   
+
 </body>
 
 </html>
