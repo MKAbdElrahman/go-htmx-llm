@@ -283,8 +283,7 @@ func (s *ChatService) HandleTokensGenerated(chatId, promptId, responseText strin
 		log.Printf("Error adding response to prompt: %v\n", err)
 		return err
 	}
-
-	log.Printf("Token added to ChatID=%s, PromptID=%s: %s\n", chatId, promptId, responseText)
+	log.Printf("Token added to ChatID=%s, PromptID=%s: %s\n", "***", promptId, responseText)
 	return nil
 }
 
@@ -360,6 +359,171 @@ func (s *ChatService) ListenForTokensGenerated() <-chan string {
 
 ```
 
+## File: `./promptprocessing/ollama-engine.go`
+- **Type**: File
+- **Extension**: `.go`
+### Content:
+```go
+package promptprocessing
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"sync"
+
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/ollama"
+)
+
+// OllamaEngine implements the LLMEngineType interface using the Ollama model.
+type OllamaEngine struct {
+	model       string
+	mu          sync.Mutex
+	activeTasks map[string]context.CancelFunc
+}
+
+func NewOllamaEngine(model string) *OllamaEngine {
+	return &OllamaEngine{
+		model:       model,
+		activeTasks: make(map[string]context.CancelFunc),
+	}
+}
+
+func (o *OllamaEngine) GenerateTokens(ctx context.Context, prompt string) (<-chan string, error) {
+	o.mu.Lock()
+	ctx, cancel := context.WithCancel(ctx)
+	o.activeTasks[prompt] = cancel
+	o.mu.Unlock()
+
+	tokenChan := make(chan string, 100)
+
+	go func() {
+		defer close(tokenChan)
+		defer func() {
+			o.mu.Lock()
+			delete(o.activeTasks, prompt)
+			o.mu.Unlock()
+		}()
+
+		llm, err := ollama.New(ollama.WithModel(o.model))
+		if err != nil {
+			log.Printf("Failed to create Ollama LLM: %v", err)
+			return
+		}
+
+		_, err = llm.Call(ctx, prompt,
+			llms.WithTemperature(0.8),
+			llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+				select {
+				case <-ctx.Done():
+					log.Println("Context canceled, stopping token generation")
+					return ctx.Err()
+				case tokenChan <- string(chunk):
+				}
+				return nil
+			}),
+		)
+
+		if err != nil && ctx.Err() == nil {
+			log.Printf("Error generating tokens: %v", err)
+		}
+	}()
+
+	return tokenChan, nil
+}
+
+func (o *OllamaEngine) StopGeneration(ctx context.Context, prompt string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	cancel, exists := o.activeTasks[prompt]
+	if !exists {
+		return fmt.Errorf("prompt %q not found or already completed", prompt)
+	}
+
+	cancel()
+	delete(o.activeTasks, prompt)
+
+	return nil
+}
+
+```
+
+## File: `./promptprocessing/prompt_processing_service.go`
+- **Type**: File
+- **Extension**: `.go`
+### Content:
+```go
+package promptprocessing
+
+import (
+	"context"
+	"demo/pubsub"
+	"log"
+)
+
+// LLMEngineType defines the interface for any LLM engine.
+type LLMEngineType interface {
+	// Starts generating tokens and returns a channel for streaming responses.
+	GenerateTokens(ctx context.Context, prompt string) (<-chan string, error)
+	// Attempts to stop a request mid-processing.
+	StopGeneration(ctx context.Context, prompt string) error
+}
+
+// PromptProcessingService handles processing prompts.
+type PromptProcessingService struct {
+	pubSub    *pubsub.PubSub
+	llmEngine LLMEngineType
+}
+
+// NewPromptProcessingService creates a new PromptProcessingService with the given LLM engine.
+func NewPromptProcessingService(pubSub *pubsub.PubSub, llmEngine LLMEngineType) *PromptProcessingService {
+	return &PromptProcessingService{
+		pubSub:    pubSub,
+		llmEngine: llmEngine,
+	}
+}
+
+func (s *PromptProcessingService) Start() {
+	s.pubSub.Subscribe("PromptSubmitted", func(payload interface{}) {
+		data, ok := payload.(map[string]interface{})
+		if !ok {
+			log.Println("Invalid payload for PromptSubmitted event")
+			return
+		}
+
+		// Extract event data
+		chatID := data["chatId"].(string)
+		promptID := data["promptId"].(string)
+		promptText := data["promptText"].(string)
+
+		log.Printf("Processing prompt: ChatID=%s, PromptID=%s, Text=%s\n", chatID, promptID, promptText)
+
+		// Generate tokens using the LLM engine
+		ctx := context.Background()
+		tokenChan, err := s.llmEngine.GenerateTokens(ctx, promptText)
+		if err != nil {
+			log.Printf("Error generating tokens: %v", err)
+			return
+		}
+
+		// Publish TokensGenerated events for each token
+		go func() {
+			for token := range tokenChan {
+				log.Printf("Generated token for ChatID=%s, PromptID=%s: %s\n", "***", promptID, token)
+				s.pubSub.Publish("TokensGenerated", map[string]interface{}{
+					"chatId":       chatID,
+					"promptId":     promptID,
+					"responseText": token,
+				})
+			}
+		}()
+	})
+}
+
+```
+
 ## File: `./cmd/main.go`
 - **Type**: File
 - **Extension**: `.go`
@@ -374,7 +538,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -420,6 +583,22 @@ func main() {
 		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"PromptSubmitted": {"id": "%s"}}`, p.Id()))
 		w.WriteHeader(http.StatusOK)
 	})
+	r.Post("/stop", func(w http.ResponseWriter, r *http.Request) {
+		prompt := r.FormValue("prompt")
+		if prompt == "" {
+			http.Error(w, "prompt is required", http.StatusBadRequest)
+			return
+		}
+
+		err := ollamaEngine.StopGeneration(r.Context(), prompt)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to stop: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Generation stopped successfully"))
+	})
 
 	r.Get("/stream", func(w http.ResponseWriter, r *http.Request) {
 		// Set headers for SSE
@@ -441,32 +620,19 @@ func main() {
 		fmt.Fprintf(w, "event: connected\ndata: Connection established\n\n")
 		flusher.Flush()
 
-		var buffer strings.Builder
 		for {
 			select {
 			case token, ok := <-tokensCh:
 				if !ok {
 					// Channel closed, signal the end of the stream
-					if buffer.Len() > 0 {
-						fmt.Fprintf(w, "event: update\ndata: %s\n\n", buffer.String())
-						buffer.Reset()
-						flusher.Flush()
-					}
 					fmt.Fprintf(w, "event: close\ndata: Stream completed\n\n")
 					flusher.Flush()
 					return
 				}
 
-				log.Printf("read token %s from channel\n", token)
-				// Append token to buffer
-				buffer.WriteString(token + " ")
-
-				// Check if the buffer contains a complete sentence (ends with a period)
-				if strings.HasSuffix(strings.TrimSpace(buffer.String()), ".") {
-					fmt.Fprintf(w, "event: update\ndata: %s\n\n", buffer.String())
-					buffer.Reset()
-					flusher.Flush()
-				}
+				// Send the generated token as an SSE message
+				fmt.Fprintf(w, "event: update\ndata: %s\n\n", token)
+				flusher.Flush()
 			case <-ctx.Done():
 				// Client disconnected
 				log.Println("Client disconnected")
@@ -475,8 +641,8 @@ func main() {
 		}
 	})
 
-	fmt.Println("Server is running on http://localhost:8081")
-	http.ListenAndServe(":8081", r)
+	fmt.Println("Server is running on http://localhost:3000")
+	http.ListenAndServe(":3000", r)
 }
 
 ```
@@ -493,25 +659,70 @@ func main() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Application</title>
-    
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 </head>
 
-<body>
-    <h1>Chat Application</h1>
-
-    <!-- Form for submitting a prompt -->
-    <form hx-post="/prompt" hx-swap="none" hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';">
-        <input type="text" id="prompt" name="prompt" placeholder="Enter your prompt..." required>
-        <button type="submit">Submit</button>
-    </form>
+<body class="bg-[#1a1a1a] text-[#e5e5e5] p-6 flex flex-col h-screen">
 
     <!-- Display streaming response -->
-    <div id="stream-response" hx-ext="sse" sse-connect="/stream" sse-swap="update" hx-swap="beforeend">
-        <!-- Responses will be appended here -->
+    <div
+        id="main-content"
+        class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4"
+    >
+        <div 
+            id="stream-response" 
+            hx-ext="sse" 
+            sse-connect="/stream" 
+            sse-swap="update" 
+            hx-swap="beforeend">
+            <!-- Responses will be appended here -->
+        </div>
     </div>
 
+    <!-- Prompt area -->
+    <div class="p-6 flex flex-col">
+        <div class="text-[#e5e5e5] flex-grow flex flex-col">
+            <form
+                hx-post="/prompt" 
+                hx-swap="none" 
+                hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';"
+                class="flex items-center space-x-2 bg-[#1a1a1a] rounded-lg border border-[#3a3a3c] p-2 hover:border-[#4C9C94] transition-colors duration-200"
+            >
+                <!-- Send Icon (Interactive Animations) -->
+                <button
+                    type="submit"
+                    class="p-1 text-[#4C9C94] hover:text-[#007acc] transition-colors duration-200 flex items-center justify-center group"
+                >
+                    <svg
+                        class="w-4 h-4 hover:w-5 hover:h-5 transition-all duration-200 animate-bounce group-hover:animate-pulse group-active:animate-ping"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                        ></path>
+                    </svg>
+                </button>
+                <!-- Input Field -->
+                <input
+                    type="text"
+                    id="prompt-input"
+                    name="prompt"
+                    placeholder="Type your prompt..."
+                    class="w-full p-2 bg-transparent text-[#e5e5e5] focus:outline-none placeholder-[#a1a1aa]"
+                    required
+                />
+                <input type="hidden" id="prompt-index" name="prompt-index" value="-1"/>
+            </form>
+        </div>
+    </div>
 </body>
 
 </html>
@@ -524,30 +735,6 @@ func main() {
 ```markdown
 ## Requirements
 
- - fix the stream endpoint
-
- the event stream look like thisin chrome  chat
-connected	Connection established	
-17:52:34.814
-update	are	
-17:52:38.699
-update	today	
-17:52:39.100
-update	Is	
-17:52:39.511
-update	something	
-17:52:39.893
-update	can	
-17:52:40.277
-update	with	
-17:52:40.650
-update	would	
-17:52:41.034
-update	like	
-17:52:41.439
-update	chat	
-17:52:41.815
-update		
-17:52:42.191
+add a stop method to the engine type 
 ```
 

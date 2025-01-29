@@ -8,7 +8,10 @@ import (
 
 // LLMEngineType defines the interface for any LLM engine.
 type LLMEngineType interface {
+	// Starts generating tokens and returns a channel for streaming responses.
 	GenerateTokens(ctx context.Context, prompt string) (<-chan string, error)
+	// Attempts to stop a request mid-processing.
+	StopGeneration(ctx context.Context, prompt string) error
 }
 
 // PromptProcessingService handles processing prompts.

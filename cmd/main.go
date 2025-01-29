@@ -32,6 +32,23 @@ func main() {
 		http.ServeFile(w, r, "index.html")
 	})
 
+	// called after POST /prompt
+	r.Get("/stream-component", func(w http.ResponseWriter, r *http.Request) {
+
+		fmt.Fprint(w,
+			`
+		<div 
+		     class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4"
+            id="stream-response" 
+            hx-ext="sse" 
+            sse-connect="/stream" 
+            sse-swap="update" 
+            hx-swap="beforeend">
+            <!-- Responses will be appended here -->
+        </div>
+		`)
+	})
+
 	// Endpoint to handle prompt submission with UUID generation
 	r.Post("/prompt", func(w http.ResponseWriter, r *http.Request) {
 		// Extract the prompt submitted
@@ -51,6 +68,22 @@ func main() {
 		// Trigger an event to notify the client
 		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"PromptSubmitted": {"id": "%s"}}`, p.Id()))
 		w.WriteHeader(http.StatusOK)
+	})
+	r.Post("/stop", func(w http.ResponseWriter, r *http.Request) {
+		prompt := r.FormValue("prompt")
+		if prompt == "" {
+			http.Error(w, "prompt is required", http.StatusBadRequest)
+			return
+		}
+
+		err := ollamaEngine.StopGeneration(r.Context(), prompt)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to stop: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Generation stopped successfully"))
 	})
 
 	r.Get("/stream", func(w http.ResponseWriter, r *http.Request) {

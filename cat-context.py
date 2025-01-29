@@ -83,8 +83,8 @@ if __name__ == "__main__":
     # List of file paths or directories to concatenate
     inputs = [
         "./chat",
+        "./promptprocessing",
         "./cmd", 
-        "./prompt-processing",
         "./index.html",
         "./prompt.md",
     ]

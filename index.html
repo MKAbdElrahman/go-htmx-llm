@@ -14,17 +14,15 @@
 
     <!-- Display streaming response -->
     <div
-        id="main-content"
-        class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4"
+        hx-trigger="PromptSubmitted from:body"
+        hx-get="/stream-component"
+        hx-select-oob="#stream-response"
     >
-        <div 
-            id="stream-response" 
-            hx-ext="sse" 
-            sse-connect="/stream" 
-            sse-swap="update" 
-            hx-swap="beforeend">
-            <!-- Responses will be appended here -->
-        </div>
+    </div>
+
+    <div id="stream-response"
+         class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4"
+    >
     </div>
 
     <!-- Prompt area -->
