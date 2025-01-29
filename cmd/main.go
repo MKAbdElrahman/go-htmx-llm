@@ -2,6 +2,7 @@ package main
 
 import (
 	"demo/chat"
+	"demo/cmd/components"
 	"demo/promptprocessing"
 	"demo/pubsub"
 	"fmt"
@@ -35,18 +36,11 @@ func main() {
 	// called after POST /prompt
 	r.Get("/stream-component", func(w http.ResponseWriter, r *http.Request) {
 
-		fmt.Fprint(w,
-			`
-		<div 
-		     class="flex-grow p-8 mt-16 overflow-y-auto scrollbar-thin scrollbar-thumb-[#4C9C94] scrollbar-track-[#1a1a1a] border border-[#3a3a3c] rounded-lg mb-4"
-            id="stream-response" 
-            hx-ext="sse" 
-            sse-connect="/stream" 
-            sse-swap="update" 
-            hx-swap="beforeend">
-            <!-- Responses will be appended here -->
-        </div>
-		`)
+		components.StreamListner().Render(r.Context(), w)
+	})
+
+	r.Get("/prompt-component", func(w http.ResponseWriter, r *http.Request) {
+		components.Prompt().Render(r.Context(), w)
 	})
 
 	// Endpoint to handle prompt submission with UUID generation

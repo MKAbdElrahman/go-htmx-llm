@@ -1,0 +1,45 @@
+package components
+
+templ Prompt() {
+	<div class="p-6 flex flex-col">
+		<div class="text-[#e5e5e5] flex-grow flex flex-col">
+			<form
+				hx-post="/prompt"
+				hx-swap="none"
+				hx-on:htmx:before-request="document.getElementById('stream-response').innerHTML = '';"
+				class="flex items-center space-x-2 bg-[#1a1a1a] rounded-lg border border-[#3a3a3c] p-2 hover:border-[#4C9C94] transition-colors duration-200"
+			>
+				<!-- Send Icon (Interactive Animations) -->
+				<button
+					type="submit"
+					class="p-1 text-[#4C9C94] hover:text-[#007acc] transition-colors duration-200 flex items-center justify-center group"
+				>
+					<svg
+						class="w-4 h-4 hover:w-5 hover:h-5 transition-all duration-200 animate-bounce group-hover:animate-pulse group-active:animate-ping"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+						xmlns="http://www.w3.org/2000/svg"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M13 5l7 7-7 7M5 5l7 7-7 7"
+						></path>
+					</svg>
+				</button>
+				<!-- Input Field -->
+				<input
+					type="text"
+					id="prompt-input"
+					name="prompt"
+					placeholder="Type your prompt..."
+					class="w-full p-2 bg-transparent text-[#e5e5e5] focus:outline-none placeholder-[#a1a1aa]"
+					required
+				/>
+				<input type="hidden" id="prompt-index" name="prompt-index" value="-1"/>
+			</form>
+		</div>
+	</div>
+}
